@@ -1,4 +1,7 @@
-export type CareerId = "architect" | "mechanical" | "chef" | "cyber" | "it";
+import { catalogById, type CatalogProgram } from "@/lib/catalog";
+
+export type CareerId = string;
+export type GuideId = "architect" | "mechanical" | "chef" | "cyber" | "it";
 
 export type Step = {
   action: string;
@@ -334,87 +337,79 @@ export const CAREERS: Career[] = [
   },
 ];
 
-export function careerById(id: CareerId): Career {
-  const found = CAREERS.find((career) => career.id === id);
-  if (!found) throw new Error("Unknown career");
-  return found;
+export function guideIdFor(id: string): GuideId | null {
+  if (id === "architect" || id === "26034") return "architect";
+  if (id === "mechanical") return "mechanical";
+  if (id === "chef" || id === "22031") return "chef";
+  if (id === "cyber" || id === "25079") return "cyber";
+  if (id === "it" || id === "25055") return "it";
+  return null;
 }
 
-export type Interest = "make" | "fix" | "help";
-export type SchoolPlan = "mdc" | "transfer";
-export type WorkTiming = "during" | "after";
-
-export type Suggestion = {
-  id: CareerId;
-  reason: string;
+const GUIDES: Record<GuideId, Career> = {
+  architect: CAREERS[0],
+  mechanical: CAREERS[1],
+  chef: CAREERS[2],
+  cyber: CAREERS[3],
+  it: CAREERS[4],
 };
 
-/** Three answers, only the five careers already in the book. Not a personality test. */
-export function suggestCareers(
-  interest: Interest,
-  school: SchoolPlan,
-  work: WorkTiming,
-): Suggestion[] {
-  if (interest === "make" && school === "transfer") {
-    return [
+function careerFromProgram(program: CatalogProgram): Career {
+  const label = `${program.awardLabel} · ${program.name}`;
+  return {
+    id: program.id,
+    name: program.name,
+    line: `${program.awardLabel}. Code ${program.code}.`,
+    start: `Starts with ${label} at Miami Dade College.`,
+    steps: [
       {
-        id: "architect",
-        reason:
-          work === "during"
-            ? "You want to make things people can see, and you can start that at MDC, then transfer. Office work can begin before the degree is finished."
-            : "You want to make things people can see. Architecture starts at MDC and continues at a university.",
+        action: `Ask an advisor to place you in ${program.name}.`,
+        short: `Enroll in ${program.name}.`,
+        explain: `${label} is on Miami Dade College’s public program inventory. The code is ${program.code}. An advisor confirms you can start it and writes the first term. The steps here are a sample, not the full course list.`,
+        done: "You have the program name, the code, and a first-term plan from an advisor.",
+        time: "Before you register.",
+        alongside: "Save the program map the advisor gives you.",
+        support: "Tell the advisor about classroom support you have used before.",
       },
-    ];
-  }
-
-  if (interest === "make") {
-    return [
       {
-        id: "chef",
-        reason:
-          "You want to make something real, and culinary arts can be finished at MDC. Kitchen shifts can start while you are still in class.",
+        action: "Finish the first classes on that map.",
+        short: "Finish the first term on the program map.",
+        explain:
+          "Take the classes the current program map lists first. A lower English or math placement can add a term. That is still the path. Do not add random classes in place of the required ones.",
+        done: "The first-term classes are passed, or you know which ones are still open.",
+        time: "The first term on the program map.",
+        alongside: "After each class, write the one thing to review before the next term.",
       },
-    ];
-  }
-
-  if (interest === "fix" && school === "transfer") {
-    return [
       {
-        id: "mechanical",
-        reason:
-          work === "during"
-            ? "You like figuring out how things work. Mechanical engineering starts with math and science at MDC, then a university degree, with a summer of hands-on work along the way."
-            : "You like figuring out how things work. Mechanical engineering starts at MDC and needs a university degree after that.",
+        action: "Check certificates, exams, or transfer while you are still enrolled.",
+        short: "Ask what this award includes besides the diploma.",
+        explain:
+          program.length === "short"
+            ? "A certificate is often the whole award. Ask if it sits inside a longer degree, and which classes you would still need."
+            : program.length === "bachelor"
+              ? "This is a bachelor’s award. Ask which associate credits already count, and which classes are still required."
+              : "An associate award sometimes includes a college certificate or leads to a bachelor’s at MDC. Ask before the last term.",
+        done: "You know whether a certificate, exam, or transfer step belongs with this award.",
+        time: "Before the last term.",
+        alongside: "Write that answer next to the program code.",
       },
-    ];
-  }
-
-  if (interest === "fix") {
-    return [
       {
-        id: "cyber",
-        reason:
-          "You like how systems work, and cybersecurity can be finished at MDC — including a bachelor’s — with a first tech job while you study.",
+        action: "Finish the award and ask what job it is meant to open.",
+        short: "Finish, then ask about the first job.",
+        explain: `When ${program.name} is posted, ask career services what first job this award is meant to open. The inventory names the program. It does not promise a job.`,
+        done: "The award is posted, or you have the remaining classes written down.",
+        time: program.length === "short" ? "Often one year or less." : program.length === "bachelor" ? "Often about four years." : "Often about two years full time.",
+        alongside: "Keep the program code with your transcript.",
       },
-    ];
-  }
-
-  const it: Suggestion = {
-    id: "it",
-    reason:
-      work === "during"
-        ? "You want to help people use technology. An IT degree at MDC can include a support job while you are still in school."
-        : "You want to help people use technology. An IT degree at MDC leads to one clear first service after you finish.",
+    ],
   };
-
-  if (school === "transfer") return [it];
-
-  return [
-    it,
-    {
-      id: "cyber",
-      reason:
-        "Cybersecurity is the other path you can finish at MDC if you would rather protect systems than explain them.",
-    },
-  ];
 }
+
+export function careerById(id: string): Career {
+  const guide = guideIdFor(id);
+  if (guide) return { ...GUIDES[guide], id };
+  const program = catalogById(id);
+  if (!program) throw new Error("Unknown career");
+  return careerFromProgram(program);
+}
+

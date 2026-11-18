@@ -1,14 +1,11 @@
-import { Auth0Provider, auth0BeforeLoad } from "@auth0/auth0-tanstack-start-react/client";
-import type { Auth0RouterContext } from "@auth0/auth0-tanstack-start-react/types";
-import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { AuthProvider } from "@/lib/auth/provider";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Major Spark";
 
-export const Route = createRootRouteWithContext<{ auth0: Auth0RouterContext }>()({
-  beforeLoad: auth0BeforeLoad(),
+export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -46,9 +43,7 @@ export const Route = createRootRouteWithContext<{ auth0: Auth0RouterContext }>()
       <body>
         <PreviewHostBridge />
         <AuthProvider>
-          <Auth0Provider>
-            <Outlet />
-          </Auth0Provider>
+          <Outlet />
         </AuthProvider>
         <Scripts />
       </body>

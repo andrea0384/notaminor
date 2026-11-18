@@ -1,35 +1,31 @@
-import { requireAuth } from "@auth0/auth0-tanstack-start-react/client";
-import type { Auth0RouterContext } from "@auth0/auth0-tanstack-start-react/types";
-import { createFileRoute, redirect } from "@tanstack/react-router";
-import { isSchoolEmail } from "@/lib/school-email";
+import { createFileRoute } from "@tanstack/react-router";
 import { Check, Settings } from "lucide-react";
-import { AuthButtons } from "@/components/auth-buttons";
 import { loadLocalProgress, saveLocalProgress, type PathSnapshot } from "@/lib/progress";
 import { pageFrame, useDevice } from "@/lib/device";
-import { PLANS, afterDegree, blockingPrereqs, courseNeeds, graduationLine, termsForPace, type StudyPace } from "@/lib/plans";
+import { planFor, afterDegree, blockingPrereqs, courseNeeds, graduationLine, termsForPace, type StudyPace } from "@/lib/plans";
 import { useEffect, useMemo, useState } from "react";
+import { ACCESS_STEP, careerById, guideIdFor, type GuideId } from "@/lib/paths";
 import {
-  CAREERS,
-  careerById,
-  ACCESS_STEP,
-  suggestCareers,
-  type CareerId,
-  type Interest,
-  type SchoolPlan,
-  type WorkTiming,
-} from "@/lib/paths";
+  CATALOG,
+  AREAS,
+  careerPathsFor,
+  clusterById,
+  clustersForArea,
+  onlyPath,
+  pathFor,
+  programsForAnswers,
+  questionForCluster,
+  searchCatalog,
+  type AreaId,
+  type ClusterId,
+  type PathQuestion,
+} from "@/lib/catalog";
 
 export const Route = createFileRoute("/app")({
-  beforeLoad: ({ context }: { context: { auth0: Auth0RouterContext } }) => {
-    requireAuth({ loginPath: "/", returnTo: "/app" })({ context });
-    if (!isSchoolEmail(context.auth0.user?.email)) {
-      throw redirect({ to: "/", search: { denied: "school" } });
-    }
-  },
   component: Home,
 });
 
-type Screen = "cover" | "careers" | "fit" | "matches" | "question" | "learn" | "path" | "list" | "plan";
+type Screen = "cover" | "careers" | "fit" | "matches" | "branch" | "question" | "learn" | "path" | "list" | "plan";
 type TextSize = "small" | "regular" | "large";
 type Style = "see" | "try" | "read" | "short";
 
@@ -54,7 +50,7 @@ const ADVISORS = [
 ] as const;
 
 const CAMPUS_FIT: Record<
-  CareerId,
+  GuideId,
   { campus: (typeof ADVISORS)[number][0]; why: string; person: string }
 > = {
   architect: {
@@ -84,6 +80,16 @@ const CAMPUS_FIT: Record<
   },
 };
 
+function campusFor(id: string) {
+  const guide = guideIdFor(id);
+  if (guide) return CAMPUS_FIT[guide];
+  return {
+    campus: "Kendall" as const,
+    why: "Ask which campus runs this program. Kendall is only a starting point until an advisor names the right one.",
+    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
+  };
+}
+
 const CAREER_HELP: Record<(typeof ADVISORS)[number][0], string> = {
   Kendall: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
   Hialeah: "MDC Works at Hialeah lists Kadijah Belle, room 2101, 305-237-8881.",
@@ -110,7 +116,7 @@ const ACCESS_OFFICES = [
 
 function Home() {
   const [screen, setScreen] = useState<Screen>("cover");
-  const [careerId, setCareerId] = useState<CareerId | null>(null);
+  const [careerId, setCareerId] = useState<string | null>(null);
   const [usedAccommodations, setUsedAccommodations] = useState(false);
   const [style, setStyle] = useState<Style>("read");
   const [showExplain, setShowExplain] = useState(true);
@@ -123,9 +129,11 @@ function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [fitStep, setFitStep] = useState(0);
   const [fitFrom, setFitFrom] = useState<"cover" | "careers">("cover");
-  const [interest, setInterest] = useState<Interest | null>(null);
-  const [school, setSchool] = useState<SchoolPlan | null>(null);
-  const [work, setWork] = useState<WorkTiming | null>(null);
+  const [field, setField] = useState<AreaId | null>(null);
+  const [cluster, setCluster] = useState<ClusterId | null>(null);
+  const [pathId, setPathId] = useState<string | null>(null);
+  const [pathStack, setPathStack] = useState<PathQuestion[]>([]);
+  const [query, setQuery] = useState("");
   const [doneCourses, setDoneCourses] = useState<string[]>([]);
   const [campus, setCampus] = useState<(typeof ADVISORS)[number][0]>("Kendall");
   const [ready, setReady] = useState(false);
@@ -144,7 +152,11 @@ function Home() {
     return step.action;
   }, [style, step]);
 
-  const matches = interest && school && work ? suggestCareers(interest, school, work) : [];
+  const pool = cluster ? programsForAnswers(cluster, "any") : [];
+  const guidedGroups = careerPathsFor(pool);
+  const pathGroups = query.trim().length >= 2 ? careerPathsFor(searchCatalog(query, pool)) : guidedGroups;
+  const openGroup = guidedGroups.find((group) => group.id === pathId) ?? null;
+  const pathQuestion = pathStack[pathStack.length - 1] ?? null;
 
   useEffect(() => {
     const on = localStorage.getItem("pathbook-reading") === "dyslexic";
@@ -181,7 +193,7 @@ function Home() {
       setStyle(snap.style as Style);
       setShowExplain(snap.showExplain);
       if (snap.careerId) {
-        const picked = careerById(snap.careerId as CareerId);
+        const picked = careerById(snap.careerId);
         setCareerId(picked.id);
         setStepIndex(Math.min(snap.stepIndex, picked.steps.length));
         setDoneCourses(snap.doneByCareer[picked.id] ?? []);
@@ -282,30 +294,78 @@ function Home() {
   function startFit(from: "cover" | "careers") {
     setFitFrom(from);
     setFitStep(0);
-    setInterest(null);
-    setSchool(null);
-    setWork(null);
+    setField(null);
+    setCluster(null);
+    setPathId(null);
+    setPathStack([]);
+    setQuery("");
     setScreen("fit");
+  }
+
+  function chooseCluster(id: ClusterId) {
+    setCluster(id);
+    setQuery("");
+    const single = onlyPath(id);
+    if (single) {
+      setPathId(single);
+      setPathStack([]);
+      setScreen("branch");
+      return;
+    }
+    const question = questionForCluster(id);
+    if (!question) {
+      setPathId(null);
+      setPathStack([]);
+      setScreen("matches");
+      return;
+    }
+    setPathStack([question]);
+    setFitStep(2);
   }
 
   function answerFit(choice: string) {
     if (fitStep === 0) {
-      setInterest(choice as Interest);
+      const area = choice as AreaId;
+      setField(area);
+      const next = clustersForArea(area);
+      if (next.length === 1) {
+        chooseCluster(next[0].id);
+        return;
+      }
+      setCluster(null);
       setFitStep(1);
       return;
     }
     if (fitStep === 1) {
-      setSchool(choice as SchoolPlan);
-      setFitStep(2);
+      chooseCluster(choice as ClusterId);
       return;
     }
-    setWork(choice as WorkTiming);
-    setScreen("matches");
+    const question = pathStack[pathStack.length - 1];
+    const option = question?.options.find((item) => item.id === choice);
+    if (!option) return;
+    if (option.next) {
+      setPathStack((stack) => [...stack, option.next!]);
+      return;
+    }
+    if (option.pathId) {
+      setPathId(option.pathId);
+      setQuery("");
+      setScreen("branch");
+    }
   }
 
-  function pickCareer(id: CareerId) {
+  function openPath(id: string, programs: { id: string }[]) {
+    if (programs.length === 1) {
+      pickCareer(programs[0].id);
+      return;
+    }
+    setPathId(id);
+    setScreen("branch");
+  }
+
+  function pickCareer(id: string) {
     setCareerId(id);
-    setCampus(CAMPUS_FIT[id].campus);
+    setCampus(campusFor(id).campus);
     setStepIndex(0);
     setUsedAccommodations(false);
     setStyle("read");
@@ -365,9 +425,11 @@ function Home() {
     setShowExplain(true);
     setLearnStep(0);
     setFitStep(0);
-    setInterest(null);
-    setSchool(null);
-    setWork(null);
+    setField(null);
+    setCluster(null);
+    setPathId(null);
+    setPathStack([]);
+    setQuery("");
     setStepIndex(0);
     setSettingsOpen(false);
     window.speechSynthesis?.cancel();
@@ -377,9 +439,6 @@ function Home() {
   return (
     <main className={frame.main}>
       <div className={frame.sheet} data-speak-root>
-        <div className="absolute top-4 left-4 z-10" data-nospeak>
-          <AuthButtons bar />
-        </div>
         <button
           type="button"
           aria-label="Settings"
@@ -484,7 +543,7 @@ function Home() {
             <p className="mt-4 font-display text-xl text-muted italic">notaminor.study</p>
             <div className="mt-8 h-px w-16 bg-rule" />
             <p className={`mt-8 text-lg leading-relaxed text-ink ${device === "phone" ? "max-w-xs" : "max-w-lg"}`}>
-              A clear path from your first class at Miami Dade College to a first job. Pick a career, or answer three questions if you are not sure yet.
+              A clear path from your first class at Miami Dade College. Search the public program list, or answer three questions if you are not sure yet.
             </p>
             <blockquote className={`mt-6 text-lg leading-relaxed text-ink italic font-semibold ${device === "phone" ? "max-w-xs" : "max-w-lg"}`}>
               “A spark, no matter how big or small, is the first step to lighting your way to a brighter tomorrow.”
@@ -493,7 +552,10 @@ function Home() {
             <div className="mt-auto flex flex-col gap-3 pt-12">
               <button
                 type="button"
-                onClick={() => setScreen("careers")}
+                onClick={() => {
+                  setQuery("");
+                  setScreen("careers");
+                }}
                 className="h-12 w-full rounded-full bg-neon text-base font-semibold text-paper shadow-neon"
               >
                 I know the career
@@ -511,28 +573,47 @@ function Home() {
 
         {screen === "careers" && (
           <section className="flex flex-1 flex-col">
-            <Header kicker="Choose one" title="Where do you want to go?" />
+            <Header kicker="Search the public list" title="What degree are you looking for?" />
+            <p className="mt-4 text-sm leading-relaxed text-muted">
+              This is Miami Dade College’s public Academic Program Inventory, revised September 16, 2025. Type a degree, certificate, or program code. It is not every course. The steps after you choose one are a starting sample. An advisor has the full course list.
+            </p>
             <button
               type="button"
               onClick={() => startFit("careers")}
               className="mt-6 h-12 w-full rounded-full border border-neon text-base font-semibold text-sage"
             >
-              Not sure yet
+              I don’t know yet
             </button>
-            <ul className="mt-6 flex flex-col gap-2">
-              {CAREERS.map((item) => (
-                <li key={item.id}>
+            <label className="mt-6 block text-sm text-muted">
+              Search
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Nursing, accounting, 25079…"
+                className="mt-1 h-12 w-full rounded-full border border-rule bg-paper px-4 text-base text-ink"
+              />
+            </label>
+            <ul className="mt-4 flex max-h-[46vh] flex-col gap-2 overflow-y-auto">
+              {searchCatalog(query).map((program) => (
+                <li key={program.id}>
                   <button
                     type="button"
-                    onClick={() => pickCareer(item.id)}
-                    className="w-full rounded-2xl border border-rule bg-paper px-4 py-4 text-left transition-colors hover:bg-paper-deep"
+                    onClick={() => pickCareer(program.id)}
+                    className="w-full rounded-2xl border border-rule bg-paper px-4 py-4 text-left"
                   >
-                    <span className="block font-display text-2xl leading-tight">{item.name}</span>
-                    <span className="mt-1 block text-sm leading-snug text-muted">{item.line}</span>
+                    <span className="block font-display text-2xl leading-tight">{program.name}</span>
+                    <span className="mt-1 block text-sm leading-snug text-muted">
+                      {pathFor(program).name} · {program.awardLabel} · code {program.code}
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
+            {query.trim().length < 2 ? (
+              <p className="mt-4 text-sm text-muted">Type at least two letters to search {CATALOG.length} public programs.</p>
+            ) : searchCatalog(query).length === 0 ? (
+              <p className="mt-4 text-sm text-muted">No public program matches that search.</p>
+            ) : null}
             <TextButton className="mt-6" onClick={() => setScreen("cover")}>
               Back
             </TextButton>
@@ -542,37 +623,32 @@ function Home() {
         {screen === "fit" && (
           <section className="flex flex-1 flex-col">
             <Header
-              kicker={`Question ${fitStep + 1} of 3`}
+              kicker="Help me choose"
               title={
                 fitStep === 0
                   ? "What sounds most like you?"
                   : fitStep === 1
-                    ? "How long do you want school to last?"
-                    : "When do you want to start working?"
+                    ? "Which group is closer?"
+                    : (pathQuestion?.prompt ?? "Which is closer?")
               }
             />
-            <div className="mt-6 flex flex-col gap-3">
+            <p className="mt-4 text-sm leading-relaxed text-muted">
+              {fitStep < 2
+                ? "Pick the closest fit. The next question names a career path."
+                : "Pick the closest fit."}
+            </p>
+            <div className="mt-6 flex max-h-[48vh] flex-col gap-3 overflow-y-auto">
               {(fitStep === 0
-                ? [
-                    ["make", "Making things I can see"],
-                    ["fix", "Figuring out how things work"],
-                    ["help", "Helping people use technology"],
-                  ]
+                ? AREAS.map((area) => [area.id, area.label] as const)
                 : fitStep === 1
-                  ? [
-                      ["mdc", "Finish at Miami Dade College"],
-                      ["transfer", "I can transfer for a longer degree"],
-                    ]
-                  : [
-                      ["during", "While I am still in school"],
-                      ["after", "After I finish"],
-                    ]
+                  ? clustersForArea(field ?? "open").map((item) => [item.id, item.label] as const)
+                  : (pathQuestion?.options.map((item) => [item.id, item.label] as const) ?? [])
               ).map(([id, label]) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => answerFit(id)}
-                  className="rounded-2xl border border-rule px-4 py-4 text-left font-display text-2xl leading-tight"
+                  className="rounded-2xl border border-rule px-4 py-4 text-left font-display text-xl leading-tight"
                 >
                   {label}
                 </button>
@@ -581,7 +657,11 @@ function Home() {
             <TextButton
               className="mt-auto pt-8"
               onClick={() =>
-                fitStep === 0 ? setScreen(fitFrom) : setFitStep((stepNumber) => stepNumber - 1)
+                fitStep === 0
+                  ? setScreen(fitFrom)
+                  : fitStep === 2 && pathStack.length > 1
+                    ? setPathStack((stack) => stack.slice(0, -1))
+                    : setFitStep((stepNumber) => (stepNumber === 2 && field && clustersForArea(field).length === 1 ? 0 : stepNumber - 1))
               }
             >
               Back
@@ -591,29 +671,84 @@ function Home() {
 
         {screen === "matches" && (
           <section className="flex flex-1 flex-col">
-            <Header kicker="A place to start" title="This might fit." />
+            <Header kicker={cluster ? clusterById(cluster).label : "Other paths"} title="Other paths in this group." />
             <p className="mt-4 text-sm leading-relaxed text-muted">
-              Not a perfect match. Just a path that lines up with what you said.
+              Other paths in the same group.
             </p>
-            <ul className="mt-6 flex flex-col gap-3">
-              {matches.map((match) => {
-                const item = careerById(match.id);
-                return (
-                  <li key={match.id}>
-                    <button
-                      type="button"
-                      onClick={() => pickCareer(match.id)}
-                      className="w-full rounded-2xl border border-rule px-4 py-4 text-left"
-                    >
-                      <span className="block font-display text-2xl leading-tight">{item.name}</span>
-                      <span className="mt-2 block text-sm leading-relaxed text-muted">{match.reason}</span>
-                    </button>
-                  </li>
-                );
-              })}
+            <label className="mt-4 block text-sm text-muted">
+              Search these paths
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Nurse, pilot, accounting…"
+                className="mt-1 h-12 w-full rounded-full border border-rule bg-paper px-4 text-base text-ink"
+              />
+            </label>
+            <ul className="mt-4 flex max-h-[46vh] flex-col gap-2 overflow-y-auto">
+              {pathGroups.map((group) => (
+                <li key={group.id}>
+                  <button
+                    type="button"
+                    onClick={() => openPath(group.id, group.programs)}
+                    className="w-full rounded-2xl border border-rule px-4 py-4 text-left"
+                  >
+                    <span className="block font-display text-2xl leading-tight">{group.name}</span>
+                    <span className="mt-1 block text-sm leading-snug text-muted">{group.line}</span>
+                    <span className="mt-2 block text-xs tracking-wide text-sage uppercase">
+                      {group.programs.length === 1 ? "1 award" : `${group.programs.length} awards`}
+                    </span>
+                  </button>
+                </li>
+              ))}
             </ul>
-            <TextButton className="mt-6" onClick={() => setScreen("careers")}>
-              See all five
+            {pathGroups.length === 0 ? (
+              <p className="mt-4 text-sm text-muted">Nothing in this cluster matched. Search the whole list instead.</p>
+            ) : null}
+            <TextButton
+              className="mt-6"
+              onClick={() => {
+                setQuery("");
+                setScreen("careers");
+              }}
+            >
+              Search the whole list
+            </TextButton>
+          </section>
+        )}
+
+        {screen === "branch" && openGroup && (
+          <section className="flex flex-1 flex-col">
+            <Header kicker="This path fits your answers" title={openGroup.name} />
+            <p className="mt-4 text-sm leading-relaxed text-muted">
+              {openGroup.line} Pick an award on this path. The steps after that are a sample, and an advisor has the full course list.
+            </p>
+            <ul className="mt-6 flex flex-col gap-2">
+              {openGroup.programs.map((program) => (
+                <li key={program.id}>
+                  <button
+                    type="button"
+                    onClick={() => pickCareer(program.id)}
+                    className="w-full rounded-2xl border border-rule px-4 py-4 text-left"
+                  >
+                    <span className="block font-display text-2xl leading-tight">{program.name}</span>
+                    <span className="mt-1 block text-sm leading-snug text-muted">
+                      {program.awardLabel} · code {program.code}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <TextButton className="mt-6" onClick={() => setScreen("fit")}>
+              Back to the questions
+            </TextButton>
+            <TextButton
+              className="mt-2"
+              onClick={() => {
+                setQuery("");
+                setScreen("matches");
+              }}
+            >
+              See other paths in this group
             </TextButton>
           </section>
         )}
@@ -774,7 +909,7 @@ function Home() {
                   <CampusNote careerId={career.id} selected={campus} />
                   <CourseChecklist
                   careerId={career.id}
-                  transferring={school === "transfer"}
+                  transferring={guideIdFor(career.id) === "mechanical" || guideIdFor(career.id) === "architect"}
                   withSupport={usedAccommodations}
                   done={doneCourses}
                   onReplace={replaceCourses}
@@ -798,7 +933,7 @@ function Home() {
                 </button>
                 {onCourses && career ? (
                   <a
-                    href={advisorMailto(campus, career.name, PLANS[career.id].program)}
+                    href={advisorMailto(campus, career.name, planFor(career.id).program)}
                     className="flex h-12 items-center justify-center rounded-full bg-neon text-center text-sm font-semibold text-paper shadow-neon"
                   >
                     Email an advisor
@@ -830,7 +965,7 @@ function Home() {
                   </select>
                 </label>
                 <a
-                  href={careerMailto(campus, career.name, PLANS[career.id].program)}
+                  href={careerMailto(campus, career.name, planFor(career.id).program)}
                   className="mt-3 flex h-12 items-center justify-center rounded-full border border-ink text-center text-sm font-semibold text-ink"
                 >
                   Email career help at {campus}
@@ -848,10 +983,10 @@ function Home() {
         {screen === "plan" && career && (
           <section className="flex flex-1 flex-col">
             <Header kicker="On-time plan" title={career.name} />
-            <p className="mt-3 text-sm leading-relaxed text-ink">{PLANS[career.id].program}</p>
-            <p className="mt-2 text-sm leading-relaxed text-muted">{PLANS[career.id].pace}</p>
+            <p className="mt-3 text-sm leading-relaxed text-ink">{planFor(career.id).program}</p>
+            <p className="mt-2 text-sm leading-relaxed text-muted">{planFor(career.id).pace}</p>
             <ol className="mt-6 flex flex-col gap-5">
-              {PLANS[career.id].terms.map((term) => (
+              {planFor(career.id).terms.map((term) => (
                 <li key={term.label}>
                   <p className="text-xs tracking-wide text-sage uppercase">
                     {term.label}
@@ -871,7 +1006,7 @@ function Home() {
             </ol>
             <h3 className="mt-8 font-display text-2xl">To get into the field</h3>
             <ul className="mt-3 flex flex-col gap-3">
-              {PLANS[career.id].entry.map((item) => (
+              {planFor(career.id).entry.map((item) => (
                 <li key={item.name} className="text-sm leading-relaxed">
                   <span className="font-semibold">{item.name}. </span>
                   {item.when}
@@ -880,7 +1015,7 @@ function Home() {
             </ul>
             <h3 className="mt-8 font-display text-2xl">During the program</h3>
             <ul className="mt-3 flex flex-col gap-3">
-              {PLANS[career.id].credentials.map((item) => (
+              {planFor(career.id).credentials.map((item) => (
                 <li key={item.name} className="text-sm leading-relaxed">
                   <span className="font-semibold">{item.name}. </span>
                   {item.when}
@@ -963,11 +1098,12 @@ function accessMailto(campus: (typeof ADVISORS)[number][0]) {
   return `mailto:${email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
-function careerPerson(campus: (typeof ADVISORS)[number][0], careerId: CareerId) {
-  if (campus === "Wolfson" && careerId === "chef") {
+function careerPerson(campus: (typeof ADVISORS)[number][0], careerId: string) {
+  const guide = guideIdFor(careerId);
+  if (campus === "Wolfson" && guide === "chef") {
     return "MDC Works at Wolfson lists Moses Washington, room 4102-06, 305-237-3876.";
   }
-  if (campus === "Wolfson" && (careerId === "cyber" || careerId === "it" || careerId === "mechanical")) {
+  if (campus === "Wolfson" && (guide === "cyber" || guide === "it" || guide === "mechanical")) {
     return "MDC Works at Wolfson lists Christian Ortega, room 4102-02, 305-237-7864.";
   }
   return CAREER_HELP[campus];
@@ -984,10 +1120,10 @@ function CampusNote({
   careerId,
   selected,
 }: {
-  careerId: CareerId;
+  careerId: string;
   selected: (typeof ADVISORS)[number][0];
 }) {
-  const fit = CAMPUS_FIT[careerId];
+  const fit = campusFor(careerId);
   return (
     <div className="mb-6">
       <p className="text-base leading-relaxed text-ink">
@@ -1018,13 +1154,13 @@ function CourseChecklist({
   done,
   onReplace,
 }: {
-  careerId: CareerId;
+  careerId: string;
   transferring: boolean;
   withSupport: boolean;
   done: string[];
   onReplace: (next: string[]) => void;
 }) {
-  const plan = PLANS[careerId];
+  const plan = planFor(careerId);
   const [pace, setPace] = useState<StudyPace>("full");
 
   useEffect(() => {
@@ -1369,7 +1505,10 @@ async function speakWithElevenLabs(text: string, stillCurrent: () => boolean) {
     const response = await fetch("/api/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({
+        text,
+        email: localStorage.getItem("major-spark-email") ?? "",
+      }),
     });
     if (!stillCurrent()) return;
     if (!response.ok) throw new Error("fallback");

@@ -393,6 +393,46 @@ var require_react = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 	module.exports = require_react_production();
 }));
 //#endregion
+//#region node_modules/react/cjs/react-jsx-runtime.production.js
+/**
+* @license React
+* react-jsx-runtime.production.js
+*
+* Copyright (c) Meta Platforms, Inc. and affiliates.
+*
+* This source code is licensed under the MIT license found in the
+* LICENSE file in the root directory of this source tree.
+*/
+var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((exports) => {
+	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
+	var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
+	function jsxProd(type, config, maybeKey) {
+		var key = null;
+		void 0 !== maybeKey && (key = "" + maybeKey);
+		void 0 !== config.key && (key = "" + config.key);
+		if ("key" in config) {
+			maybeKey = {};
+			for (var propName in config) "key" !== propName && (maybeKey[propName] = config[propName]);
+		} else maybeKey = config;
+		config = maybeKey.ref;
+		return {
+			$$typeof: REACT_ELEMENT_TYPE,
+			type,
+			key,
+			ref: void 0 !== config ? config : null,
+			props: maybeKey
+		};
+	}
+	exports.Fragment = REACT_FRAGMENT_TYPE;
+	exports.jsx = jsxProd;
+	exports.jsxs = jsxProd;
+}));
+//#endregion
+//#region node_modules/react/jsx-runtime.js
+var require_jsx_runtime = /* @__PURE__ */ __commonJSMin(((exports, module) => {
+	module.exports = require_react_jsx_runtime_production();
+}));
+//#endregion
 //#region node_modules/@tanstack/router-core/dist/esm/not-found.js
 /** Determine if a value is a TanStack Router not-found error. */
 function isNotFound(obj) {
@@ -3919,6 +3959,7 @@ var BaseRootRoute = class extends BaseRoute {
 };
 //#endregion
 //#region node_modules/seroval/dist/index.js
+var import_jsx_runtime = require_jsx_runtime();
 var SYM_ASYNC_ITERATOR = Symbol.asyncIterator;
 var SYM_HAS_INSTANCE = Symbol.hasInstance;
 var SYM_IS_CONCAT_SPREADABLE = Symbol.isConcatSpreadable;
@@ -6681,48 +6722,7 @@ function fromJSON(source, options = {}) {
 	}), source.t);
 }
 //#endregion
-//#region node_modules/react/cjs/react-jsx-runtime.production.js
-/**
-* @license React
-* react-jsx-runtime.production.js
-*
-* Copyright (c) Meta Platforms, Inc. and affiliates.
-*
-* This source code is licensed under the MIT license found in the
-* LICENSE file in the root directory of this source tree.
-*/
-var require_react_jsx_runtime_production = /* @__PURE__ */ __commonJSMin(((exports) => {
-	var REACT_ELEMENT_TYPE = Symbol.for("react.transitional.element");
-	var REACT_FRAGMENT_TYPE = Symbol.for("react.fragment");
-	function jsxProd(type, config, maybeKey) {
-		var key = null;
-		void 0 !== maybeKey && (key = "" + maybeKey);
-		void 0 !== config.key && (key = "" + config.key);
-		if ("key" in config) {
-			maybeKey = {};
-			for (var propName in config) "key" !== propName && (maybeKey[propName] = config[propName]);
-		} else maybeKey = config;
-		config = maybeKey.ref;
-		return {
-			$$typeof: REACT_ELEMENT_TYPE,
-			type,
-			key,
-			ref: void 0 !== config ? config : null,
-			props: maybeKey
-		};
-	}
-	exports.Fragment = REACT_FRAGMENT_TYPE;
-	exports.jsx = jsxProd;
-	exports.jsxs = jsxProd;
-}));
-//#endregion
-//#region node_modules/react/jsx-runtime.js
-var require_jsx_runtime = /* @__PURE__ */ __commonJSMin(((exports, module) => {
-	module.exports = require_react_jsx_runtime_production();
-}));
-//#endregion
 //#region node_modules/@tanstack/react-router/dist/esm/CatchBoundary.js
-var import_jsx_runtime = require_jsx_runtime();
 var CatchBoundary = class extends import_react.Component {
 	constructor(..._args) {
 		super(..._args);
@@ -7532,20 +7532,6 @@ var Route = class extends BaseRoute {
 */
 function createRoute(options) {
 	return new Route(options);
-}
-/**
-* Creates a root route factory that requires a router context type.
-*
-* Use when your root route expects `context` to be provided to `createRouter`.
-* The returned function behaves like `createRootRoute` but enforces a context type.
-*
-* @returns A factory function to configure and return a root route.
-* @link https://tanstack.com/router/latest/docs/framework/react/api/router/createRootRouteWithContextFunction
-*/
-function createRootRouteWithContext() {
-	return (options) => {
-		return createRootRoute(options);
-	};
 }
 var RootRoute = class extends BaseRootRoute {
 	/**
@@ -18258,4 +18244,4 @@ var renderRouterToStream = async ({ request, router, responseHeaders, children }
 	}
 };
 //#endregion
-export { createInlineCssStyleAsset as A, isDangerousProtocol as B, createStream as C, toCrossJSONAsync as D, isStream as E, waitForReason as F, rootRouteId as G, dehydrateSsrMatchId as H, _getRenderedMatches as I, isNotFound as K, invariant as L, getStylesheetHref as M, resolveManifestAssetLink as N, toCrossJSONStream as O, resolveManifestCssLink as P, createSieveCache as R, createPlugin as S, fromJSON as T, isRedirect as U, isPromise as V, redirect as W, createRootRouteWithContext as _, isSsrResponse as a, useRouter as b, createHydrationScripts as c, HeadContent as d, RouterProvider as f, createFileRoute as g, lazyRouteComponent as h, disposeSsrResponse as i, getScriptPreloadAttrs as j, createInlineCssPlaceholderAsset as k, GLOBAL_TSR as l, Outlet as m, bindSsrResponseToRequest as n, normalizeSsrResponse as o, createRouter as p, require_react as q, defineHandlerCallback as r, stripSsrResponseBody as s, renderRouterToStream as t, Scripts as u, useRouteContext as v, crossSerializeStream as w, require_jsx_runtime as x, useNavigate as y, decodePath as z };
+export { getStylesheetHref as A, dehydrateSsrMatchId as B, fromJSON as C, createInlineCssPlaceholderAsset as D, toCrossJSONStream as E, invariant as F, require_react as G, rootRouteId as H, createSieveCache as I, decodePath as L, resolveManifestCssLink as M, waitForReason as N, createInlineCssStyleAsset as O, _getRenderedMatches as P, isDangerousProtocol as R, crossSerializeStream as S, toCrossJSONAsync as T, isNotFound as U, isRedirect as V, require_jsx_runtime as W, createRootRoute as _, isSsrResponse as a, createPlugin as b, createHydrationScripts as c, HeadContent as d, RouterProvider as f, createFileRoute as g, lazyRouteComponent as h, disposeSsrResponse as i, resolveManifestAssetLink as j, getScriptPreloadAttrs as k, GLOBAL_TSR as l, Outlet as m, bindSsrResponseToRequest as n, normalizeSsrResponse as o, createRouter as p, defineHandlerCallback as r, stripSsrResponseBody as s, renderRouterToStream as t, Scripts as u, Link as v, isStream as w, createStream as x, useRouter as y, isPromise as z };

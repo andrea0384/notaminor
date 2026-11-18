@@ -1,18 +1,12 @@
 import { n as __exportAll } from "../_runtime.mjs";
-import { B as isDangerousProtocol, D as toCrossJSONAsync, F as waitForReason, G as rootRouteId, I as _getRenderedMatches, K as isNotFound, L as invariant, M as getStylesheetHref, N as resolveManifestAssetLink, O as toCrossJSONStream, P as resolveManifestCssLink, T as fromJSON, U as isRedirect, V as isPromise, a as isSsrResponse, f as RouterProvider, i as disposeSsrResponse, j as getScriptPreloadAttrs, n as bindSsrResponseToRequest, o as normalizeSsrResponse, q as require_react, r as defineHandlerCallback, s as stripSsrResponseBody, t as renderRouterToStream, x as require_jsx_runtime } from "../_libs/@tanstack/react-router+[...].mjs";
+import { A as getStylesheetHref, C as fromJSON, E as toCrossJSONStream, F as invariant, G as require_react, H as rootRouteId, M as resolveManifestCssLink, N as waitForReason, P as _getRenderedMatches, R as isDangerousProtocol, T as toCrossJSONAsync, U as isNotFound, V as isRedirect, W as require_jsx_runtime, a as isSsrResponse, f as RouterProvider, i as disposeSsrResponse, j as resolveManifestAssetLink, k as getScriptPreloadAttrs, n as bindSsrResponseToRequest, o as normalizeSsrResponse, r as defineHandlerCallback, s as stripSsrResponseBody, t as renderRouterToStream, z as isPromise } from "../_libs/@tanstack/react-router+[...].mjs";
 import { n as createServerHistory } from "../_libs/tanstack__history.mjs";
-import { a as splitSetCookieString, c as createRawStreamRPCPlugin, d as createSerializationAdapter, i as serialize, l as defaultSerovalDeserializerPlugins, n as parse, o as attachRouterServerSsrUtils, r as parseSetCookie, s as getNormalizedURL, t as mergeHeaders, u as makeSerovalPlugin } from "../_libs/@tanstack/router-core+[...].mjs";
+import { a as getNormalizedURL, c as makeSerovalPlugin, i as attachRouterServerSsrUtils, l as createSerializationAdapter, n as parseSetCookie, o as createRawStreamRPCPlugin, r as splitSetCookieString, s as defaultSerovalDeserializerPlugins, t as mergeHeaders } from "../_libs/@tanstack/router-core+[...].mjs";
 import { AsyncLocalStorage } from "node:async_hooks";
 //#region node_modules/.nitro/vite/services/ssr/index.js
 var ssr_exports = /* @__PURE__ */ __exportAll({
-	a: () => getRequest,
 	createServerEntry: () => createServerEntry,
 	default: () => server_default,
-	i: () => getCookies,
-	n: () => deleteCookie,
-	o: () => getResponseHeaders,
-	r: () => getCookie,
-	s: () => setCookie,
 	t: () => createMiddleware
 });
 require_react();
@@ -112,12 +106,6 @@ function getErrorHeaders(error) {
 	for (const name of GENERATED_BODY_EXCLUDED_HEADERS) headers.delete(name);
 	return headers;
 }
-function getResponseState(event) {
-	return event.responseState ||= {
-		headers: new Headers(),
-		clearHeaders: false
-	};
-}
 function getDistinctCookieKey(name, options, defaultPath = "") {
 	return [
 		name,
@@ -147,13 +135,6 @@ function getMergedSetCookieValues(state, currentCookies, cookiesToMerge) {
 	const cookieKeysToMerge = /* @__PURE__ */ new Set();
 	for (const cookie of cookiesToMerge) cookieKeysToMerge.add(getCookieKey(state, cookie));
 	return currentCookies.filter((cookie) => !cookieKeysToMerge.has(getCookieKey(state, cookie))).concat(cookiesToMerge);
-}
-function mergeStartSetCookieValues(event, cookies) {
-	if (cookies.length === 0) return;
-	const state = getResponseState(event);
-	state.removedHeaders?.delete("set-cookie");
-	if (state.setCookieBehavior !== "replace") state.setCookieBehavior = "merge";
-	replaceSetCookieValues(state.headers, getMergedSetCookieValues(state, getSetCookieValues(state.headers), cookies));
 }
 function hasProtectedHeaderChanges(response, protectedHeaders) {
 	const headers = response.headers;
@@ -485,95 +466,6 @@ function getParsedRequestUrl(request) {
 	if (event && event.request === request) return event.requestUrl;
 	return new URL(request.url);
 }
-function getRequest() {
-	return getStartEvent().request;
-}
-function getRequestHeaders() {
-	return getStartEvent().request.headers;
-}
-/**
-* Outside production, return the snapshot as a Headers subclass that warns when
-* code tries to change the outgoing response through it. Its contents and
-* behavior are identical to the production snapshot.
-*/
-function toResponseHeadersSnapshot(headers) {
-	return headers;
-}
-/**
-* Read a detached snapshot of the effective response headers.
-* Use response header and cookie helpers to change the outgoing response.
-*/
-function getResponseHeaders() {
-	const event = getStartEvent();
-	const state = event.responseState;
-	const currentResponse = event.currentResponse;
-	if (!currentResponse) return toResponseHeadersSnapshot(state ? new Headers(state.headers) : new Headers());
-	const protectedHeaders = getProtectedResponseHeaders(currentResponse);
-	let headers = currentResponse.headers;
-	if (state) headers = applyHeaderState(headers, state, isSerializedResponse(protectedHeaders), protectedHeaders, event.responseHeaderAppends?.get(currentResponse));
-	if (headers === currentResponse.headers) headers = new Headers(headers);
-	if (protectedHeaders) applyProtectedHeaders(protectedHeaders, headers);
-	return toResponseHeadersSnapshot(headers);
-}
-/**
-* Parse the request to get HTTP Cookie header string and return an object of all cookie name-value pairs.
-* @returns Object of cookie name-value pairs
-* ```ts
-* const cookies = getCookies()
-* ```
-*/
-function getCookies() {
-	const cookies = parse(getRequestHeaders().get("cookie") || "");
-	const definedCookies = Object.create(null);
-	for (const [name, value] of Object.entries(cookies)) if (value !== void 0) definedCookies[name] = value;
-	return definedCookies;
-}
-/**
-* Get a cookie value by name.
-* @param name Name of the cookie to get
-* @returns {*} Value of the cookie (String or undefined)
-* ```ts
-* const authorization = getCookie('Authorization')
-* ```
-*/
-function getCookie(name) {
-	return getCookies()[name];
-}
-/**
-* Set a cookie value by name.
-* @param name Name of the cookie to set
-* @param value Value of the cookie to set
-* @param options {CookieSerializeOptions} Options for serializing the cookie
-* ```ts
-* setCookie('Authorization', '1234567')
-* ```
-*/
-function setCookie(name, value, options) {
-	const { encode, stringify, ...attrs } = options ?? {};
-	mergeStartSetCookieValues(getStartEvent(), [serialize({
-		name,
-		value,
-		path: "/",
-		...attrs
-	}, {
-		encode,
-		stringify
-	})]);
-}
-/**
-* Remove a cookie by name.
-* @param name Name of the cookie to delete
-* @param serializeOptions {CookieSerializeOptions} Cookie options
-* ```ts
-* deleteCookie('SessionId')
-* ```
-*/
-function deleteCookie(name, options) {
-	setCookie(name, "", {
-		...options,
-		maxAge: 0
-	});
-}
 /**
 * Internal: helper status state for a serialized server-function reply.
 * Bodyless statuses never apply to it and are omitted with their status text.
@@ -597,7 +489,7 @@ var HEADERS = { TSS_SHELL: "X-TSS_SHELL" };
 * the dev styles URL for route-scoped CSS collection.
 */
 async function getStartManifest(matchedRoutes) {
-	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-f3oFcWx1.mjs");
+	const { tsrStartManifest } = await import("../_tanstack-start-manifest_v-DxNt_Wrv.mjs");
 	const startManifest = tsrStartManifest();
 	let routes = startManifest.routes;
 	routes[rootRouteId];
@@ -1922,8 +1814,8 @@ var getBaseManifest = getProdBaseManifest;
 var createEarlyHintsForRequest = createEarlyHintsCollector;
 async function loadEntries() {
 	const [routerEntry, startEntry, pluginAdapters] = await Promise.all([
-		import("./router--4lWF-63.mjs").then((n) => n.t),
-		import("./start-BCZOIWtr.mjs"),
+		import("./router-Gvr5NxDZ.mjs").then((n) => n.t),
+		import("./start-BEcMMpM4.mjs"),
 		import("./empty-plugin-adapters-D9UWiqvJ.mjs")
 	]);
 	return {
@@ -2485,4 +2377,4 @@ var fetch = createStartHandler(defaultStreamHandler);
 var createServerEntry = createServerEntry$1;
 var server_default = createServerEntry({ fetch });
 //#endregion
-export { getRequest as a, ssr_exports as c, createServerEntry, server_default as default, getCookies as i, deleteCookie as n, getResponseHeaders as o, getCookie as r, setCookie as s, createMiddleware as t };
+export { createServerEntry, server_default as default, ssr_exports as n, createMiddleware as t };

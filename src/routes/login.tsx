@@ -1,5 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { AuthButtons } from "@/components/auth-buttons";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -12,11 +11,11 @@ function LoginPage() {
         <p className="font-display text-sm tracking-wide text-sage">Miami Dade College</p>
         <h1 className="mt-8 font-display text-5xl leading-none font-medium text-ink">Major Spark</h1>
         <p className="mt-6 text-lg leading-relaxed text-ink">
-          Sign in to keep this path for you. Everyone else gets their own.
+          No account is required. Enter your email on the main page to generate speech.
         </p>
-        <div className="mt-10">
-          <AuthButtons />
-        </div>
+        <Link to="/" className="mt-10 text-center text-base font-semibold text-sage">
+          Back to the main page
+        </Link>
       </section>
     </main>
   );

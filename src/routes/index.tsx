@@ -1,31 +1,10 @@
-import { useAuth0, useLogin } from "@auth0/auth0-tanstack-start-react/client";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { isSchoolEmail } from "@/lib/school-email";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    denied: search.denied === "school" ? ("school" as const) : undefined,
-  }),
-  loader: async () => {
-    return { safeBuild: true };
-  },
   component: Landing,
 });
 
 function Landing() {
-  const login = useLogin();
-  const navigate = useNavigate();
-  const { denied } = Route.useSearch();
-  const { isAuthenticated, isLoading, user } = useAuth0();
-  const schoolAccount = isAuthenticated && isSchoolEmail(user?.email);
-
-  useEffect(() => {
-    if (!isLoading && schoolAccount) {
-      void navigate({ to: "/app" });
-    }
-  }, [isLoading, navigate, schoolAccount]);
-
   return (
     <main className="relative isolate min-h-dvh">
       <img
@@ -38,28 +17,17 @@ function Landing() {
         Major Spark
       </h1>
 
-      <div className="absolute right-0 bottom-[8%] left-0 z-10 flex flex-col items-center gap-3 px-6">
-        {denied ? (
-          <p className="max-w-sm text-center font-sans text-sm text-white">Use an @mymdc.net email to enter.</p>
-        ) : null}
-        <button
-          type="button"
-          onClick={() => {
-            if (typeof window === "undefined") return;
-            login("/app", denied ? { authorizationParams: { prompt: "login" } } : undefined);
-          }}
+      <div className="absolute right-0 bottom-[8%] left-0 z-10 flex justify-center px-6">
+        <Link
+          to="/app"
           className="bg-transparent pl-[0.55em] font-sans text-2xl font-medium tracking-[0.55em] text-white uppercase"
           style={{
             textShadow: "0 0 6px #67e8f9, 0 0 14px #38bdf8, 0 0 28px #2563eb",
           }}
         >
           Enter
-        </button>
+        </Link>
       </div>
     </main>
   );
 }
-
-// Cache Busting Deploy Flag V2
-// CACHE_FORCE_CLEAR_HASH_999
-

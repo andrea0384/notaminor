@@ -1,4 +1,5 @@
-import type { CareerId } from "@/lib/paths";
+import { guideIdFor, type GuideId } from "@/lib/paths";
+import { catalogById } from "@/lib/catalog";
 
 export type PlanCourse = {
   code: string;
@@ -25,7 +26,7 @@ export type Plan = {
   struggles: string[];
 };
 
-export const PLANS: Record<CareerId, Plan> = {
+export const PLANS: Record<GuideId, Plan> = {
   architect: {
     program: "A.S. Architectural Design and Construction Technology · code 26034 · 66 credits",
     pace: "Six terms if you study full time, on the Fall 2024 sequence guide. A licensed architect still needs a professional degree after MDC.",
@@ -711,18 +712,64 @@ export function graduationLine(termCount: number): string {
   return `${termCount} terms, ${span}, if you start in the fall and keep going through fall, spring, and summer.`;
 }
 
-export function afterDegree(careerId: CareerId): string | null {
-  if (careerId === "architect") {
+export function planFor(id: string): Plan {
+  const guide = guideIdFor(id);
+  if (guide) return PLANS[guide];
+  const program = catalogById(id);
+  const name = program?.name ?? "this program";
+  const award = program ? `${program.awardLabel} · code ${program.code}` : "Program";
+  return {
+    program: `${name}. ${award}. The classes below are a sample, not the official sequence.`,
+    pace: "An advisor sets the real terms. Miami Dade College’s public inventory names the award. It does not list every class here.",
+    terms: [
+      {
+        label: "Before you start",
+        credits: "Advisor",
+        courses: [
+          { code: "Meet", name: "Confirm this program and the current map with an advisor" },
+          { code: "Place", name: "Ask if English or math placement adds a class" },
+        ],
+      },
+      {
+        label: "First term",
+        credits: "On the program map",
+        courses: [
+          { code: "Start", name: "Register only for classes the current map lists first" },
+          { code: "Support", name: "Ask ACCESS about accommodations before the term starts, if you use them" },
+        ],
+      },
+      {
+        label: "Later",
+        credits: "Until the award posts",
+        courses: [
+          { code: "Core", name: `Finish the required courses for ${name}` },
+          { code: "Check", name: "Ask which certificate, license, or transfer step belongs with this award" },
+        ],
+      },
+    ],
+    entry: [{ name: "Advisor meeting", when: "Before you register." }],
+    credentials: [{ name: program?.awardLabel ?? "This award", when: "When the college posts it as finished." }],
+    struggles: ["The official course list can change. Use the current program map, not this sample."],
+  };
+}
+
+export function afterDegree(id: string): string | null {
+  const guide = guideIdFor(id);
+  if (guide === "architect") {
     return "That finishes the MDC associate degree. A professional architecture degree comes after it.";
   }
-  if (careerId === "mechanical") {
+  if (guide === "mechanical") {
     return "That finishes the MDC associate degree. The engineering bachelor’s comes after you transfer.";
   }
-  if (careerId === "cyber") {
+  if (guide === "cyber") {
     return "That finishes the associate degree. The bachelor’s in cybersecurity at MDC comes after it.";
   }
-  if (careerId === "it") {
+  if (guide === "it") {
     return "That finishes the associate degree. A bachelor’s in information systems comes after it if you continue.";
+  }
+  const program = catalogById(id);
+  if (program?.length === "associate") {
+    return "That finishes this associate award. Ask if a bachelor’s at Miami Dade College comes next.";
   }
   return null;
 }
