@@ -494,10 +494,26 @@ const OUTSIDE: Record<string, PathNote[]> = {
       when: "Hotels ask for a food card or a front-office skill. Finish one before you graduate. The class does not hand you the card.",
     },
   ],
-  humansvc: [
+  leadership: [
     {
-      name: "A state human-services credential the job names",
-      when: "Casework jobs add their own card. Ask which one this track expects, and start it before the last term so you graduate with it.",
+      name: "Advanced Technical Certificate: Project Management",
+      when: "Code C6004. Courses in this bachelor’s can post it. Ask for it to be posted when those courses are done. It is not a second degree and not something to discover years later.",
+    },
+    {
+      name: "Advanced Technical Certificate: Human Resources Management",
+      when: "Code C6001. Same path. Ask for it to be posted with the bachelor’s when the courses are done.",
+    },
+  ],
+  publicsafety: [
+    {
+      name: "Florida Law Enforcement Academy, firefighter certification, or the Crime Scene Technician certificate",
+      when: "This bachelor’s sits on a public-safety credential. The academy and the fire program are at North Campus. The bachelor’s does not replace that card. Hold it before you finish, or finish it while you are enrolled.",
+    },
+  ],
+  architect: [
+    {
+      name: "Design portfolio",
+      when: "Build it during the drawing and design courses at Kendall. Transfer schools and firms ask for it. The degree does not assemble it for you.",
     },
   ],
 };
@@ -557,8 +573,8 @@ export function pathExtras(programId: string): { field: PathNote[]; certificates
   });
   if (unique.length === 0) {
     unique.push({
-      name: `One outside certificate in ${pathFor(program).name.toLowerCase()}`,
-      when: "This award does not list a shorter college certificate inside it. Before the last term, pick the card employers in this field ask for and schedule it. Graduate with it, not years later.",
+      name: `${program.awardLabel}: ${program.name}`,
+      when: `Code ${program.code}. The courses on this page are the full award. MDC does not list a second college certificate inside this one. Finish these courses before you leave. A license, if this job has one, is listed separately and is not included in the classes.`,
     });
   }
   return { field: [], certificates: unique };

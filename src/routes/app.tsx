@@ -4,7 +4,8 @@ import { loadLocalProgress, saveLocalProgress, type PathSnapshot } from "@/lib/p
 import { pageFrame, useDevice } from "@/lib/device";
 import { planFor, afterDegree, blockingPrereqs, courseNeeds, paceSummary, termsForPace, type StudyPace } from "@/lib/plans";
 import { useEffect, useMemo, useState } from "react";
-import { ACCESS_STEP, careerById, guideIdFor, type GuideId } from "@/lib/paths";
+import { campusFit } from "@/lib/campuses";
+import { ACCESS_STEP, careerById, guideIdFor } from "@/lib/paths";
 import {
   CATALOG,
   AREAS,
@@ -49,50 +50,8 @@ const ADVISORS = [
   ["Wolfson", "wadvisement@mdc.edu"],
 ] as const;
 
-const CAMPUS_FIT: Record<
-  GuideId,
-  { campus: (typeof ADVISORS)[number][0]; why: string; person: string }
-> = {
-  architect: {
-    campus: "Kendall",
-    why: "Kendall has the School of Architecture and Interior Design. The drawing and design labs are based there, so that is the better chance of a seat.",
-    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
-  },
-  mechanical: {
-    campus: "Kendall",
-    why: "Kendall houses the School of Engineering, Technology and Design. The later engineering classes are more likely to be open there. Early English and math can be taken closer to home.",
-    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
-  },
-  chef: {
-    campus: "Wolfson",
-    why: "The culinary labs are at the Miami Culinary Institute on the Wolfson Campus, downtown. That is the campus that runs this degree.",
-    person: "MDC Works at Wolfson lists Moses Washington, room 4102-06, 305-237-3876.",
-  },
-  cyber: {
-    campus: "North",
-    why: "North Campus publishes this associate degree as a program you can start there. Kendall is where the later bachelor’s courses were added. For these classes, North is the clearer seat.",
-    person: "MDC Works at North lists Maria Sincere, room 1101-04, 305-237-1056.",
-  },
-  it: {
-    campus: "Kendall",
-    why: "Kendall houses the School of Engineering, Technology and Design, so the A+ and networking labs are more likely to be open there. Padrón also lists this kind of program. Compare both schedules.",
-    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
-  },
-  mobile: {
-    campus: "Kendall",
-    why: "Kendall houses the School of Engineering, Technology and Design, so the programming labs are more likely to be open there. Compare the North Campus schedule too.",
-    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
-  },
-};
-
 function campusFor(id: string) {
-  const guide = guideIdFor(id);
-  if (guide) return CAMPUS_FIT[guide];
-  return {
-    campus: "Kendall" as const,
-    why: "Ask which campus runs this program. Kendall is only a starting point until an advisor names the right one.",
-    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
-  };
+  return campusFit(id);
 }
 
 const CAREER_HELP: Record<(typeof ADVISORS)[number][0], string> = {
@@ -192,13 +151,14 @@ function Home() {
         localStorage.setItem(`pathbook-courses-${id}`, JSON.stringify(list));
       }
       localStorage.setItem("pathbook-pace", snap.pace);
-      const campusName = ADVISORS.some(([name]) => name === snap.campus) ? snap.campus : "Kendall";
-      setCampus(campusName as (typeof ADVISORS)[number][0]);
       setUsedAccommodations(snap.usedAccommodations);
       setStyle(snap.style as Style);
       setShowExplain(snap.showExplain);
       if (snap.careerId) {
         const picked = careerById(snap.careerId);
+        const fit = campusFit(picked.id);
+        const campusName = ADVISORS.some(([name]) => name === snap.campus) ? snap.campus : fit.campus;
+        setCampus((campusName === "Kendall" && fit.campus !== "Kendall" ? fit.campus : campusName) as (typeof ADVISORS)[number][0]);
         setCareerId(picked.id);
         setStepIndex(Math.min(snap.stepIndex, picked.steps.length));
         setDoneCourses(snap.doneByCareer[picked.id] ?? []);
@@ -1144,7 +1104,7 @@ function CampusNote({
   return (
     <div className="mb-6">
       <p className="text-base leading-relaxed text-ink">
-        The fuller set of classes is more likely at {fit.campus} Campus. {fit.why}
+        The classes for this program are at {fit.where}. {fit.why}
       </p>
       {selected !== fit.campus && (
         <p className="mt-2 text-sm leading-relaxed text-muted">
