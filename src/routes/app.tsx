@@ -1546,10 +1546,7 @@ async function speakWithElevenLabs(text: string, stillCurrent: () => boolean) {
     const response = await fetch("/api/speak", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        text,
-        email: localStorage.getItem("major-spark-email") ?? "",
-      }),
+      body: JSON.stringify({ text }),
     });
     if (!stillCurrent()) return;
     if (!response.ok) throw new Error("fallback");

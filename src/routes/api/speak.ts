@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 const VOICE = "EXAVITQu4vr4xnSDxMaL";
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function jsonError(error: string, message: string, status: number) {
   return Response.json({ error, message }, { status });
@@ -13,12 +12,8 @@ export const Route = createFileRoute("/api/speak")({
       POST: async ({ request }) => {
         try {
           const body = await request.json().catch(() => null);
-          const email = typeof body?.email === "string" ? body.email.trim() : "";
           const text =
             typeof body?.text === "string" ? body.text.replace(/\s+/g, " ").trim().slice(0, 800) : "";
-          if (!EMAIL_PATTERN.test(email)) {
-            return jsonError("invalid-email", "Enter a valid email address.", 400);
-          }
           if (!text) return jsonError("empty", "Enter the text to speak.", 400);
 
           const key = process.env.ELEVENLABS_API_KEY?.trim();
