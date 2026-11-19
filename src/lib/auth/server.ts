@@ -48,7 +48,11 @@ import {
 } from "./preview";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
-void ensureDbReady();
+// Skip on Vercel when no DATABASE_URL is configured: the embedded database
+// cannot start in that function and was taking down every page.
+if (!process.env.VERCEL || process.env.DATABASE_URL?.trim()) {
+  void ensureDbReady();
+}
 
 /**
  * Preview secret must outlive module reloads: PGLite (and its session rows) is
