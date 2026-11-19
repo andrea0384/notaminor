@@ -1237,27 +1237,38 @@ function CourseChecklist({
         Skipping summers, or starting in a lower math or English class, makes it longer.
       </p>
       {later && <p className="mt-2 text-sm leading-relaxed">{later}</p>}
-      <h3 className="mt-6 font-display text-2xl">What it takes</h3>
+      <h3 className="mt-6 font-display text-2xl">What you finish with</h3>
       <p className="mt-2 text-sm leading-relaxed">
-        Finish this program, then meet the field requirements below. The job asks for the same degree and the same exams either way.
+        The degree is one part. These field requirements and certificates come with the path so you have them when you graduate, not years later.
       </p>
-      <ul className="mt-3 flex flex-col gap-2">
-        {plan.entry.map((item) => (
-          <li key={item.name} className="text-sm leading-relaxed">
-            <span className="font-semibold">{item.name}. </span>
-            {item.when}
-          </li>
-        ))}
-      </ul>
+      {plan.entry.length > 0 && (
+        <>
+          <h4 className="mt-4 text-sm font-semibold uppercase tracking-wide text-sage">Field requirements for the job</h4>
+          <ul className="mt-2 flex flex-col gap-2">
+            {plan.entry.map((item) => (
+              <li key={item.name} className="text-sm leading-relaxed">
+                <span className="font-semibold">{item.name}. </span>
+                {item.when}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {plan.credentials.length > 0 && (
-        <ul className="mt-3 flex flex-col gap-2">
-          {plan.credentials.map((item) => (
-            <li key={item.name} className="text-sm leading-relaxed">
-              <span className="font-semibold">{item.name}. </span>
-              {item.when}
-            </li>
-          ))}
-        </ul>
+        <>
+          <h4 className="mt-4 text-sm font-semibold uppercase tracking-wide text-sage">Certificates you earn along the way</h4>
+          <ul className="mt-2 flex flex-col gap-2">
+            {plan.credentials.map((item) => (
+              <li key={item.name} className="text-sm leading-relaxed">
+                <span className="font-semibold">{item.name}. </span>
+                {item.when}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {plan.entry.length === 0 && plan.credentials.length === 0 && (
+        <p className="mt-2 text-sm leading-relaxed">Ask an advisor which stackable certificates and industry exams this program prepares you for. Finish them before you graduate.</p>
       )}
       {withSupport && (
         <>

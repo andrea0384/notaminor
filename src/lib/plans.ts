@@ -27,6 +27,85 @@ export type Plan = {
 };
 
 export const PLANS: Record<GuideId, Plan> = {
+  mobile: {
+    program: "A.S. Computer Programming and Analysis – Mobile Applications Development · code 25070 · 60 credits",
+    pace: "Five terms if you study full time, on the Spring 2025 sequence guide.",
+    terms: [
+      {
+        label: "Term 1",
+        credits: "14 credits",
+        courses: [
+          { code: "ENC 1101", name: "English Composition 1" },
+          { code: "CGS 1060C", name: "Introduction to Computer Technology and Applications" },
+          { code: "COP 1334", name: "Introduction to C++ Programming" },
+          { code: "MAC 1105", name: "College Algebra" },
+        ],
+      },
+      {
+        label: "Term 2",
+        credits: "12 credits",
+        courses: [
+          { code: "CGS 1540C", name: "Database Concepts and Design" },
+          { code: "COP 2800", name: "Java Programming" },
+          { code: "Humanities", name: "One humanities course" },
+        ],
+      },
+      {
+        label: "Term 3",
+        credits: "9 credits",
+        courses: [
+          { code: "CIS 2331", name: "Systems Analysis, Design and Implementation" },
+          { code: "Social science", name: "AMH 2010, AMH 2020, or POS 2041" },
+        ],
+      },
+      {
+        label: "Term 4",
+        credits: "12 credits",
+        courses: [
+          { code: "COP 2660", name: "Android Application Development 1" },
+          { code: "COP 2662", name: "Android Application Development 2" },
+          { code: "Elective", name: "One program elective" },
+        ],
+      },
+      {
+        label: "Term 5",
+        credits: "12 credits",
+        courses: [
+          { code: "COP 2654", name: "iPhone Application Development 1" },
+          { code: "COP 2658", name: "iPhone Application Development 2" },
+          { code: "Elective", name: "One program elective" },
+        ],
+      },
+    ],
+    entry: [
+      {
+        name: "No state license required",
+        when: "You do not need a Florida license to work as an app developer.",
+      },
+    ],
+    credentials: [
+      {
+        name: "College Credit Certificate: Computer Programmer – Mobile Applications Development",
+        when: "You earn it by finishing the marked programming and mobile courses. It is part of the degree, not a later add-on.",
+      },
+      {
+        name: "Apple App Development with Swift certification",
+        when: "Available through the Miami Codes partnership when you complete COP 2654 and COP 2658. The two Apple classes prepare you. Ask about the free certification path for Miami-Dade residents.",
+      },
+      {
+        name: "Oracle Certified Associate: Java Programmer",
+        when: "COP 2800 prepares you. Buy the exam from Oracle and schedule it when you are ready. Finish it before you graduate so it is on your resume with the degree.",
+      },
+    ],
+    struggles: [
+      "Switching between Apple and Android tools and languages in the same term can feel like starting over.",
+      "The first working app takes longer than the tutorial suggests. Quiet practice time helps.",
+      "App Store and Play Store rules change. What worked last term may need a small update.",
+      "Debugging on a real device is slower than the simulator. Build in extra time for that.",
+      "Group projects assume everyone can share code and merge changes without friction.",
+    ],
+  },
+
   architect: {
     program: "A.S. Architectural Design and Construction Technology · code 26034 · 66 credits",
     pace: "Six terms if you study full time, on the Fall 2024 sequence guide. A licensed architect still needs a professional degree after MDC.",
@@ -763,6 +842,9 @@ export function afterDegree(id: string): string | null {
   }
   if (guide === "cyber") {
     return "That finishes the associate degree. The bachelor’s in cybersecurity at MDC comes after it.";
+  }
+  if (guide === "mobile") {
+    return "That finishes the associate degree. You leave with the Mobile Applications Development certificate and the Apple Swift certification path ready.";
   }
   if (guide === "it") {
     return "That finishes the associate degree. A bachelor’s in information systems comes after it if you continue.";

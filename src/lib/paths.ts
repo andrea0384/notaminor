@@ -1,7 +1,7 @@
 import { catalogById, type CatalogProgram } from "@/lib/catalog";
 
 export type CareerId = string;
-export type GuideId = "architect" | "mechanical" | "chef" | "cyber" | "it";
+export type GuideId = "architect" | "mechanical" | "chef" | "cyber" | "it" | "mobile";
 
 export type Step = {
   action: string;
@@ -343,6 +343,7 @@ export function guideIdFor(id: string): GuideId | null {
   if (id === "chef" || id === "22031") return "chef";
   if (id === "cyber" || id === "25079") return "cyber";
   if (id === "it" || id === "25055") return "it";
+  if (id === "mobile" || id === "25070") return "mobile";
   return null;
 }
 
@@ -352,6 +353,13 @@ const GUIDES: Record<GuideId, Career> = {
   chef: CAREERS[2],
   cyber: CAREERS[3],
   it: CAREERS[4],
+  mobile: {
+    id: "mobile",
+    name: "Mobile App Developer",
+    line: "Build apps for iPhone, Android, and more.",
+    start: "Start with the programming basics, then the two Apple and two Android courses.",
+    steps: [],
+  },
 };
 
 function careerFromProgram(program: CatalogProgram): Career {
