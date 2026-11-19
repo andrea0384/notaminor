@@ -78,6 +78,11 @@ const CAMPUS_FIT: Record<
     why: "Kendall houses the School of Engineering, Technology and Design, so the A+ and networking labs are more likely to be open there. Padrón also lists this kind of program. Compare both schedules.",
     person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
   },
+  mobile: {
+    campus: "Kendall",
+    why: "Kendall houses the School of Engineering, Technology and Design, so the programming labs are more likely to be open there. Compare the North Campus schedule too.",
+    person: "MDC Works at Kendall lists Bernard Krogh, room R243, 305-237-2128.",
+  },
 };
 
 function campusFor(id: string) {
