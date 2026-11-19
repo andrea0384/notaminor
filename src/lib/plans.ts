@@ -2,11 +2,16 @@ import { guideIdFor, type GuideId } from "@/lib/paths";
 import { catalogById } from "@/lib/catalog";
 import { strugglesFor } from "@/lib/struggles";
 import rawSheets from "@/lib/program-sheets.json";
+import rawReqs from "@/lib/course-prereqs.json";
 import { pathExtras } from "@/lib/certificates";
 
 export type PlanCourse = {
   code: string;
   name: string;
+  /** Course codes on this plan that must be finished first. */
+  needs?: string[];
+  /** Course codes to take in the same term. */
+  with?: string[];
 };
 
 export type PlanTerm = {
@@ -42,6 +47,184 @@ type SheetFile = Record<
 >;
 
 const SHEETS = rawSheets as SheetFile;
+
+type ReqFile = Record<string, Record<string, { pre: string[]; co: string[] }>>;
+const REQS = rawReqs as ReqFile;
+
+/** Used when the program sheet does not print the prerequisite, but both courses are on the plan. */
+const CHAIN: Record<string, string[]> = {
+  "ENC 1102": ["ENC 1101"],
+  "ENC 2300": ["ENC 1101"],
+  "LIT 2000": ["ENC 1101"],
+  "MAC 1140": ["MAC 1105"],
+  "MAC 1114": ["MAC 1105"],
+  "MAC 2311": ["MAC 1140"],
+  "MAC 2312": ["MAC 2311"],
+  "MAC 2313": ["MAC 2312"],
+};
+
+function rulesFor(programCode: string, courseCode: string): { pre: string[]; co: string[] } {
+  const row = REQS[programCode]?.[courseCode];
+  const pre = [...(row?.pre ?? [])];
+  for (const code of CHAIN[courseCode] ?? []) {
+    if (!pre.includes(code)) pre.push(code);
+  }
+  return { pre, co: [...(row?.co ?? [])] };
+}
+
+type OrderNode = {
+  id: string;
+  pick: "all" | "one" | "some";
+  courses: PlanCourse[];
+  credits: string;
+  requires: string[];
+  index: number;
+};
+
+function orderSheet(programCode: string, sections: SheetFile[string]["sections"]): PlanTerm[] {
+  const present = new Set(sections.flatMap((section) => section.courses.map((course) => course.code)));
+  const ruleMap = new Map<string, { pre: Set<string>; co: Set<string> }>();
+  for (const code of present) {
+    const rules = rulesFor(programCode, code);
+    ruleMap.set(code, {
+      pre: new Set(rules.pre.filter((item) => present.has(item) && item !== code)),
+      co: new Set(rules.co.filter((item) => present.has(item) && item !== code)),
+    });
+  }
+  for (const [code, row] of ruleMap) {
+    for (const other of [...row.pre]) {
+      const back = ruleMap.get(other);
+      if (!back?.pre.has(code)) continue;
+      row.pre.delete(other);
+      back.pre.delete(code);
+      row.co.add(other);
+      back.co.add(code);
+    }
+  }
+  const nodes: OrderNode[] = [];
+  sections.forEach((section, sectionIndex) => {
+    if (section.pick !== "all") {
+      const needed = new Set<string>();
+      for (const course of section.courses) {
+        for (const code of ruleMap.get(course.code)?.pre ?? []) needed.add(code);
+      }
+      nodes.push({
+        id: `choice-${sectionIndex}`,
+        pick: section.pick,
+        courses: section.courses.map((course) => ({
+          ...course,
+          needs: [...(ruleMap.get(course.code)?.pre ?? [])],
+          with: [...(ruleMap.get(course.code)?.co ?? [])],
+        })),
+        credits: section.credits,
+        requires: [...needed],
+        index: nodes.length,
+      });
+      return;
+    }
+    for (const course of section.courses) {
+      const row = ruleMap.get(course.code);
+      nodes.push({
+        id: `${course.code}-${nodes.length}`,
+        pick: "all",
+        courses: [
+          {
+            ...course,
+            needs: [...(row?.pre ?? [])],
+            with: [...(row?.co ?? [])],
+          },
+        ],
+        credits: "",
+        requires: [...(row?.pre ?? [])],
+        index: nodes.length,
+      });
+    }
+  });
+
+  const byCode = new Map<string, OrderNode>();
+  for (const node of nodes) {
+    if (node.pick === "all" && node.courses.length === 1) byCode.set(node.courses[0].code, node);
+  }
+  const parent = new Map<string, string>();
+  const find = (code: string): string => {
+    const next = parent.get(code) ?? code;
+    if (next === code) return code;
+    const root = find(next);
+    parent.set(code, root);
+    return root;
+  };
+  const unite = (left: string, right: string) => {
+    const a = find(left);
+    const b = find(right);
+    if (a !== b) parent.set(b, a);
+  };
+  for (const node of nodes) {
+    if (node.pick !== "all" || node.courses.length !== 1) continue;
+    const code = node.courses[0].code;
+    for (const other of node.courses[0].with ?? []) {
+      if (byCode.has(other)) unite(code, other);
+    }
+  }
+  const clusters = new Map<string, OrderNode[]>();
+  for (const [code, node] of byCode) {
+    const root = find(code);
+    const group = clusters.get(root) ?? [];
+    group.push(node);
+    clusters.set(root, group);
+  }
+  const consumed = new Set<string>();
+  const orderedNodes: OrderNode[] = [];
+  for (const node of nodes) {
+    if (node.pick !== "all" || node.courses.length !== 1) {
+      orderedNodes.push(node);
+      continue;
+    }
+    const code = node.courses[0].code;
+    const root = find(code);
+    if (consumed.has(root)) continue;
+    consumed.add(root);
+    const group = clusters.get(root) ?? [node];
+    if (group.length === 1) {
+      orderedNodes.push(node);
+      continue;
+    }
+    const own = new Set(group.map((item) => item.courses[0].code));
+    const requires = [...new Set(group.flatMap((item) => item.requires))].filter((code) => !own.has(code));
+    orderedNodes.push({
+      id: `with-${root}`,
+      pick: "all",
+      courses: group.map((item) => item.courses[0]),
+      credits: "Take together",
+      requires,
+      index: Math.min(...group.map((item) => item.index)),
+    });
+  }
+
+  const requiredCodes = new Set(
+    orderedNodes.filter((node) => node.pick === "all").flatMap((node) => node.courses.map((course) => course.code)),
+  );
+  for (const node of orderedNodes) {
+    const own = new Set(node.courses.map((course) => course.code));
+    node.requires = node.requires.filter((code) => requiredCodes.has(code) && !own.has(code));
+  }
+
+  const remaining = [...orderedNodes];
+  const placed: OrderNode[] = [];
+  const done = new Set<string>();
+  while (remaining.length > 0) {
+    const readyAt = remaining.findIndex((node) => node.requires.every((code) => done.has(code)));
+    const node = remaining.splice(readyAt === -1 ? 0 : readyAt, 1)[0];
+    placed.push(node);
+    for (const course of node.courses) done.add(course.code);
+  }
+
+  return placed.map((node, index) => ({
+    label: String(index + 1),
+    credits: node.pick === "all" ? node.credits : node.credits,
+    pick: node.pick,
+    courses: node.courses,
+  }));
+}
 
 export const PLANS: Record<GuideId, Plan> = {
   mobile: {
@@ -682,7 +865,7 @@ const MUST_FINISH_FIRST: Record<string, string[][]> = {
 };
 
 export function blockingPrereqs(course: PlanCourse, doneKeys: string[], onPlan: Set<string>): string[] {
-  const groups = MUST_FINISH_FIRST[course.code];
+  const groups = course.needs?.map((code) => [code]) ?? MUST_FINISH_FIRST[course.code];
   if (!groups) return [];
   const doneCodes = new Set(doneKeys.map((key) => key.split("|")[0]));
   const missing: string[] = [];
@@ -695,6 +878,8 @@ export function blockingPrereqs(course: PlanCourse, doneKeys: string[], onPlan: 
 }
 
 export function courseNeeds(course: PlanCourse): string | null {
+  if (course.with && course.with.length > 0) return `Take with ${course.with.join(" and ")}.`;
+  if (course.needs && course.needs.length > 0) return `After ${course.needs.join(", ")}.`;
   const needs: Record<string, string> = {
     "ENC 1101": "May need a placement class before you can start.",
     "ENC 1102": "After ENC 1101.",
@@ -868,14 +1053,9 @@ function basePlan(id: string): Plan {
   if (sheet && sheet.sections.some((section) => section.courses.length > 0)) {
     return {
       program: `${name}. ${award}.${sheet.headline ? ` ${sheet.headline}.` : ""}`,
-      pace: "This is the public program sheet: the courses the award asks for. It is not a term-by-term schedule. An advisor sets the order. Confirm the sheet is still current before you register.",
+      pace: "Listed in the order to take them. A class stays below the classes it requires. General-education choices can move earlier if a seat is open. Confirm the current sheet with an advisor.",
       sheet: true,
-      terms: sheet.sections.map((section) => ({
-        label: section.label,
-        credits: section.credits,
-        pick: section.pick,
-        courses: section.courses,
-      })),
+      terms: orderSheet(program?.code ?? "", sheet.sections),
       entry: [],
       credentials: [],
       struggles: strugglesFor(id),

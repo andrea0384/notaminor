@@ -955,8 +955,12 @@ function Home() {
                 <li key={term.label}>
                   <p className="text-xs tracking-wide text-sage uppercase">
                     {term.label}
-                    <span className="text-rule"> · </span>
-                    {term.credits}
+                    {term.credits ? (
+                      <>
+                        <span className="text-rule"> · </span>
+                        {term.credits}
+                      </>
+                    ) : null}
                   </p>
                   <ul className="mt-2 flex flex-col gap-2">
                     {term.courses.map((course) => (
@@ -1294,7 +1298,7 @@ function CourseChecklist({
       </div>
       <p className="mt-4 text-sm text-muted">
         {plan.sheet
-          ? "Check a class when you have finished it. In a choose group, one finished class covers that group."
+          ? "Classes are in the order to take them. Check a class when you have finished it. In a choose group, one finished class covers that group."
           : "Classes stay in the order to take them. A note under a class names what has to come first, or what you take with it."}
       </p>
       <ol className="mt-6 flex flex-col gap-5">
@@ -1302,8 +1306,12 @@ function CourseChecklist({
           <li key={term.label}>
             <p className="text-xs tracking-wide text-sage uppercase">
               {term.label}
-              <span className="text-rule"> · </span>
-              {term.credits}
+              {term.credits ? (
+                <>
+                  <span className="text-rule"> · </span>
+                  {term.credits}
+                </>
+              ) : null}
             </p>
             <ul className="mt-2 flex flex-col gap-2">
               {term.courses.map((course) => {
