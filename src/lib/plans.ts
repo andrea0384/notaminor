@@ -1,5 +1,8 @@
 import { guideIdFor, type GuideId } from "@/lib/paths";
 import { catalogById } from "@/lib/catalog";
+import { strugglesFor } from "@/lib/struggles";
+import rawSheets from "@/lib/program-sheets.json";
+import { pathExtras } from "@/lib/certificates";
 
 export type PlanCourse = {
   code: string;
@@ -10,6 +13,8 @@ export type PlanTerm = {
   label: string;
   credits: string;
   courses: PlanCourse[];
+  /** all = take every course. one = pick one. some = pick enough to meet the credit note. */
+  pick?: "all" | "one" | "some";
 };
 
 export type PlanCredential = {
@@ -24,7 +29,19 @@ export type Plan = {
   entry: PlanCredential[];
   credentials: PlanCredential[];
   struggles: string[];
+  /** Public program sheet, not a made-up term schedule. */
+  sheet?: boolean;
 };
+
+type SheetFile = Record<
+  string,
+  {
+    headline: string;
+    sections: { label: string; credits: string; pick: "all" | "one" | "some"; courses: PlanCourse[] }[];
+  }
+>;
+
+const SHEETS = rawSheets as SheetFile;
 
 export const PLANS: Record<GuideId, Plan> = {
   mobile: {
@@ -746,7 +763,7 @@ export function termsForPace(plan: Plan, pace: StudyPace, transferring: boolean)
   const source = transferring
     ? plan.terms.filter((term) => term.label !== "Before you transfer")
     : plan.terms;
-  if (pace === "full") return source;
+  if (pace === "full" || plan.sheet) return source;
 
   const cap = pace === "three-quarter" ? 9 : 6;
   const flat = source.flatMap((term) => term.courses).flatMap(expand);
@@ -791,44 +808,92 @@ export function graduationLine(termCount: number): string {
   return `${termCount} terms, ${span}, if you start in the fall and keep going through fall, spring, and summer.`;
 }
 
+export function paceSummary(plan: Plan, pace: StudyPace, termCount: number): string {
+  const slower = "Skipping summers, or starting in a lower math or English class, makes it longer.";
+  if (!plan.sheet) {
+    const load =
+      pace === "full"
+        ? "This matches the full-time sequence guide."
+        : pace === "three-quarter"
+          ? "Same classes, about 9 credits a term."
+          : "Same classes, about 6 credits a term.";
+    return `${graduationLine(termCount)} ${load} ${slower}`;
+  }
+  const match = plan.program.match(/(\d+(?:\.\d+)?)\s+credits/i);
+  const credits = match ? Number(match[1]) : null;
+  const perTerm = pace === "full" ? 12 : pace === "three-quarter" ? 9 : 6;
+  const load =
+    pace === "full" ? "Full time is about 12 credits a term." : pace === "three-quarter" ? "Three-quarter time is about 9 credits a term." : "Part time is about 6 credits a term.";
+  if (!credits || Number.isNaN(credits)) {
+    return `${load} The course list stays the same. An advisor sets how many you take each term. ${slower}`;
+  }
+  const terms = Math.max(1, Math.ceil(credits / perTerm));
+  return `${graduationLine(terms)} ${load} The course groups stay the same. ${slower}`;
+}
+
 export function planFor(id: string): Plan {
+  return attachExtras(id, basePlan(id));
+}
+
+function attachExtras(id: string, plan: Plan): Plan {
+  const extra = pathExtras(id);
+  const entry = dedupe([
+    ...plan.entry.filter((item) => !/advisor meeting/i.test(item.name)),
+    ...extra.field,
+  ]);
+  const credentials = dedupe([
+    ...plan.credentials.filter((item) => !/when the college posts it as finished/i.test(item.when)),
+    ...extra.certificates,
+  ]);
+  return { ...plan, entry, credentials };
+}
+
+function dedupe(items: PlanCredential[]): PlanCredential[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = item.name.toLowerCase().replace(/[^a-z0-9+]+/g, "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function basePlan(id: string): Plan {
   const guide = guideIdFor(id);
   if (guide) return PLANS[guide];
   const program = catalogById(id);
   const name = program?.name ?? "this program";
   const award = program ? `${program.awardLabel} · code ${program.code}` : "Program";
+  const sheet = program ? SHEETS[program.code] : undefined;
+  if (sheet && sheet.sections.some((section) => section.courses.length > 0)) {
+    return {
+      program: `${name}. ${award}.${sheet.headline ? ` ${sheet.headline}.` : ""}`,
+      pace: "This is the public program sheet: the courses the award asks for. It is not a term-by-term schedule. An advisor sets the order. Confirm the sheet is still current before you register.",
+      sheet: true,
+      terms: sheet.sections.map((section) => ({
+        label: section.label,
+        credits: section.credits,
+        pick: section.pick,
+        courses: section.courses,
+      })),
+      entry: [],
+      credentials: [],
+      struggles: strugglesFor(id),
+    };
+  }
   return {
-    program: `${name}. ${award}. The classes below are a sample, not the official sequence.`,
-    pace: "An advisor sets the real terms. Miami Dade College’s public inventory names the award. It does not list every class here.",
+    program: `${name}. ${award}.`,
+    pace: "The public program sheet for this code did not include a readable course list. Ask an advisor for the current one.",
     terms: [
       {
-        label: "Before you start",
-        credits: "Advisor",
-        courses: [
-          { code: "Meet", name: "Confirm this program and the current map with an advisor" },
-          { code: "Place", name: "Ask if English or math placement adds a class" },
-        ],
-      },
-      {
-        label: "First term",
-        credits: "On the program map",
-        courses: [
-          { code: "Start", name: "Register only for classes the current map lists first" },
-          { code: "Support", name: "Ask ACCESS about accommodations before the term starts, if you use them" },
-        ],
-      },
-      {
-        label: "Later",
-        credits: "Until the award posts",
-        courses: [
-          { code: "Core", name: `Finish the required courses for ${name}` },
-          { code: "Check", name: "Ask which certificate, license, or transfer step belongs with this award" },
-        ],
+        label: "Course list",
+        credits: "Ask an advisor",
+        courses: [{ code: "Advisor", name: "Ask for the current program sheet before you register" }],
       },
     ],
-    entry: [{ name: "Advisor meeting", when: "Before you register." }],
-    credentials: [{ name: program?.awardLabel ?? "This award", when: "When the college posts it as finished." }],
-    struggles: ["The official course list can change. Use the current program map, not this sample."],
+    entry: [],
+    credentials: [],
+    struggles: strugglesFor(id),
   };
 }
 

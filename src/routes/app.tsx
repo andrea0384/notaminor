@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Check, Settings } from "lucide-react";
 import { loadLocalProgress, saveLocalProgress, type PathSnapshot } from "@/lib/progress";
 import { pageFrame, useDevice } from "@/lib/device";
-import { planFor, afterDegree, blockingPrereqs, courseNeeds, graduationLine, termsForPace, type StudyPace } from "@/lib/plans";
+import { planFor, afterDegree, blockingPrereqs, courseNeeds, paceSummary, termsForPace, type StudyPace } from "@/lib/plans";
 import { useEffect, useMemo, useState } from "react";
 import { ACCESS_STEP, careerById, guideIdFor, type GuideId } from "@/lib/paths";
 import {
@@ -1004,26 +1004,38 @@ function Home() {
                 </li>
               ))}
             </ol>
-            <h3 className="mt-8 font-display text-2xl">To get into the field</h3>
-            <ul className="mt-3 flex flex-col gap-3">
-              {planFor(career.id).entry.map((item) => (
-                <li key={item.name} className="text-sm leading-relaxed">
-                  <span className="font-semibold">{item.name}. </span>
-                  {item.when}
-                </li>
-              ))}
-            </ul>
-            <h3 className="mt-8 font-display text-2xl">During the program</h3>
-            <ul className="mt-3 flex flex-col gap-3">
-              {planFor(career.id).credentials.map((item) => (
-                <li key={item.name} className="text-sm leading-relaxed">
-                  <span className="font-semibold">{item.name}. </span>
-                  {item.when}
-                </li>
-              ))}
-            </ul>
+            <h3 className="mt-8 font-display text-2xl">Certificates on this path</h3>
+            {planFor(career.id).credentials.length > 0 ? (
+              <ul className="mt-3 flex flex-col gap-3">
+                {planFor(career.id).credentials.map((item) => (
+                  <li key={item.name} className="text-sm leading-relaxed">
+                    <span className="font-semibold">{item.name}. </span>
+                    {item.when}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm leading-relaxed">
+                This award does not include a shorter college certificate. Ask an advisor, before the last term, whether the job expects an outside exam.
+              </p>
+            )}
+            {planFor(career.id).entry.length > 0 && (
+              <>
+                <h3 className="mt-8 font-display text-2xl">To work in the field</h3>
+                <ul className="mt-3 flex flex-col gap-3">
+                  {planFor(career.id).entry.map((item) => (
+                    <li key={item.name} className="text-sm leading-relaxed">
+                      <span className="font-semibold">{item.name}. </span>
+                      {item.when}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             <p className="mt-8 text-xs leading-relaxed text-muted">
-              Taken from Miami Dade College’s full-time course sequence guides. A lower math or English placement adds terms. Confirm the current guide with an advisor. This is not a degree audit.
+              {planFor(career.id).sheet
+                ? "Taken from Miami Dade College’s public program sheets. A choose group is a menu, not a list you finish every line of. Confirm the current sheet with an advisor. This is not a degree audit."
+                : "Taken from Miami Dade College’s full-time course sequence guides. A lower math or English placement adds terms. Confirm the current guide with an advisor. This is not a degree audit."}
             </p>
             <div className="mt-6">
               <TextButton onClick={() => setScreen("list")}>Back to the steps</TextButton>
@@ -1176,8 +1188,19 @@ function CourseChecklist({
   const terms = termsForPace(plan, pace, transferring);
   const keys = terms.flatMap((term) => term.courses.map((course) => courseKey(course.code, course.name)));
   const onPlan = new Set(keys.map((key) => key.split("|")[0]));
-  const finished = keys.filter((key) => done.includes(key)).length;
-  const percent = keys.length === 0 ? 0 : Math.round((finished / keys.length) * 100);
+  let slotTotal = 0;
+  let slotDone = 0;
+  for (const term of terms) {
+    const termKeys = term.courses.map((course) => courseKey(course.code, course.name));
+    if (term.pick === "one" || term.pick === "some") {
+      slotTotal += 1;
+      if (termKeys.some((key) => done.includes(key))) slotDone += 1;
+    } else {
+      slotTotal += termKeys.length;
+      slotDone += termKeys.filter((key) => done.includes(key)).length;
+    }
+  }
+  const percent = slotTotal === 0 ? 0 : Math.round((slotDone / slotTotal) * 100);
   const later = afterDegree(careerId);
 
   function withoutDependents(next: string[]) {
@@ -1227,37 +1250,20 @@ function CourseChecklist({
           </button>
         ))}
       </div>
-      <p className="mt-4 text-sm leading-relaxed">
-        {graduationLine(terms.length)}
-        {pace === "full"
-          ? " This matches the full-time sequence guide."
-          : pace === "three-quarter"
-            ? " Same classes, about 9 credits a term."
-            : " Same classes, about 6 credits a term."}{" "}
-        Skipping summers, or starting in a lower math or English class, makes it longer.
-      </p>
-      {later && <p className="mt-2 text-sm leading-relaxed">{later}</p>}
-      <h3 className="mt-6 font-display text-2xl">What you finish with</h3>
-      <p className="mt-2 text-sm leading-relaxed">
-        The degree is one part. These field requirements and certificates come with the path so you have them when you graduate, not years later.
-      </p>
-      {plan.entry.length > 0 && (
-        <>
-          <h4 className="mt-4 text-sm font-semibold uppercase tracking-wide text-sage">Field requirements for the job</h4>
-          <ul className="mt-2 flex flex-col gap-2">
-            {plan.entry.map((item) => (
-              <li key={item.name} className="text-sm leading-relaxed">
-                <span className="font-semibold">{item.name}. </span>
-                {item.when}
-              </li>
-            ))}
-          </ul>
-        </>
+      <p className="mt-4 text-sm leading-relaxed">{paceSummary(plan, pace, terms.length)}</p>
+      {plan.sheet && (
+        <p className="mt-2 text-sm leading-relaxed">
+          “Choose 1” means pick one course in that group. “Choose about” means pick enough courses to reach that number of credits. You do not take every course in a choose group.
+        </p>
       )}
-      {plan.credentials.length > 0 && (
+      {later && <p className="mt-2 text-sm leading-relaxed">{later}</p>}
+      <h3 className="mt-6 font-display text-2xl">Certificates on this path</h3>
+      {plan.credentials.length > 0 ? (
         <>
-          <h4 className="mt-4 text-sm font-semibold uppercase tracking-wide text-sage">Certificates you earn along the way</h4>
-          <ul className="mt-2 flex flex-col gap-2">
+          <p className="mt-2 text-sm leading-relaxed">
+            Finish these with the degree, not years later. A college certificate posts from courses you already take. An outside exam is separate. The class does not hand you the card. Schedule it before you graduate.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
             {plan.credentials.map((item) => (
               <li key={item.name} className="text-sm leading-relaxed">
                 <span className="font-semibold">{item.name}. </span>
@@ -1266,9 +1272,26 @@ function CourseChecklist({
             ))}
           </ul>
         </>
+      ) : (
+        <p className="mt-2 text-sm leading-relaxed">
+          This award does not include a shorter college certificate. Ask an advisor, before the last term, whether the job expects an outside exam.
+        </p>
       )}
-      {plan.entry.length === 0 && plan.credentials.length === 0 && (
-        <p className="mt-2 text-sm leading-relaxed">Ask an advisor which stackable certificates and industry exams this program prepares you for. Finish them before you graduate.</p>
+      {plan.entry.length > 0 && (
+        <>
+          <h3 className="mt-6 font-display text-2xl">To work in the field</h3>
+          <p className="mt-2 text-sm leading-relaxed">
+            These are separate from the certificates above. Finishing the courses does not replace them.
+          </p>
+          <ul className="mt-3 flex flex-col gap-2">
+            {plan.entry.map((item) => (
+              <li key={item.name} className="text-sm leading-relaxed">
+                <span className="font-semibold">{item.name}. </span>
+                {item.when}
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       {withSupport && (
         <>
@@ -1305,7 +1328,9 @@ function CourseChecklist({
         <div className="h-full rounded-full bg-neon" style={{ width: `${percent}%` }} />
       </div>
       <p className="mt-4 text-sm text-muted">
-        Classes stay in the order to take them. A note under a class names what has to come first, or what you take with it.
+        {plan.sheet
+          ? "Check a class when you have finished it. In a choose group, one finished class covers that group."
+          : "Classes stay in the order to take them. A note under a class names what has to come first, or what you take with it."}
       </p>
       <ol className="mt-6 flex flex-col gap-5">
         {terms.map((term) => (
