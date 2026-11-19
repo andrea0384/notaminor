@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Check, Settings } from "lucide-react";
+import { Check, ChevronRight, Settings } from "lucide-react";
 import { loadLocalProgress, saveLocalProgress, type PathSnapshot } from "@/lib/progress";
 import { pageFrame, useDevice } from "@/lib/device";
 import { planFor, afterDegree, blockingPrereqs, courseNeeds, paceSummary, termsForPace, type StudyPace } from "@/lib/plans";
@@ -1143,6 +1143,7 @@ function CourseChecklist({
 }) {
   const plan = planFor(careerId);
   const [pace, setPace] = useState<StudyPace>("full");
+  const [openChoices, setOpenChoices] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const saved = localStorage.getItem("pathbook-pace");
@@ -1220,11 +1221,6 @@ function CourseChecklist({
         ))}
       </div>
       <p className="mt-4 text-sm leading-relaxed">{paceSummary(plan, pace, terms.length)}</p>
-      {plan.sheet && (
-        <p className="mt-2 text-sm leading-relaxed">
-          “Choose 1” means pick one course in that group. “Choose about” means pick enough courses to reach that number of credits. You do not take every course in a choose group.
-        </p>
-      )}
       {later && <p className="mt-2 text-sm leading-relaxed">{later}</p>}
       <h3 className="mt-6 font-display text-2xl">Certificates on this path</h3>
       {plan.credentials.length > 0 ? (
@@ -1302,54 +1298,89 @@ function CourseChecklist({
           : "Classes stay in the order to take them. A note under a class names what has to come first, or what you take with it."}
       </p>
       <ol className="mt-6 flex flex-col gap-5">
-        {terms.map((term) => (
-          <li key={term.label}>
-            <p className="text-xs tracking-wide text-sage uppercase">
-              {term.label}
-              {term.credits ? (
-                <>
-                  <span className="text-rule"> · </span>
-                  {term.credits}
-                </>
-              ) : null}
-            </p>
-            <ul className="mt-2 flex flex-col gap-2">
-              {term.courses.map((course) => {
-                const key = courseKey(course.code, course.name);
-                const checked = done.includes(key);
-                const blocked = !checked && blockingPrereqs(course, done, onPlan).length > 0;
-                return (
-                  <li key={key}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(course)}
-                      disabled={blocked}
-                      aria-pressed={checked}
-                      className={`flex w-full items-start gap-3 text-left ${blocked ? "cursor-not-allowed opacity-40" : ""}`}
-                    >
-                      <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${checked ? "border-neon bg-neon text-paper" : "border-ink bg-paper"}`}
-                        aria-hidden="true"
-                      >
-                        {checked && <Check size={12} strokeWidth={3} />}
-                      </span>
-                      <span className="text-sm leading-relaxed">
-                        <span className="font-semibold">{course.code}. </span>
-                        {course.name}
-                        {courseNeeds(course) && (
-                          <span className="mt-1 block text-muted">{courseNeeds(course)}</span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </li>
-        ))}
+        {terms.map((term) => {
+          const choice = (term.pick === "one" || term.pick === "some") && term.courses.length > 1;
+          const open = openChoices[term.label] === true;
+          const picked = term.courses.filter((course) => done.includes(courseKey(course.code, course.name)));
+          return (
+            <li key={term.label}>
+              {choice ? (
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenChoices((current) => ({ ...current, [term.label]: !open }))}
+                  className="flex w-full items-start gap-2 text-left"
+                >
+                  <ChevronRight
+                    size={18}
+                    className={`mt-0.5 shrink-0 transition-transform ${open ? "rotate-90" : ""}`}
+                    aria-hidden="true"
+                  />
+                  <span className="text-sm leading-relaxed">
+                    <span className="font-semibold">{term.pick === "some" ? choiceTitle("some", term.credits) : "Choose 1"}</span>
+                    <span className="mt-1 block text-muted">
+                      {picked.length > 0
+                        ? picked.map((course) => course.code).join(", ")
+                        : `${term.courses.length} options`}
+                    </span>
+                  </span>
+                </button>
+              ) : (
+                <p className="text-xs tracking-wide text-sage uppercase">
+                  {term.label}
+                  {term.credits ? (
+                    <>
+                      <span className="text-rule"> · </span>
+                      {term.credits}
+                    </>
+                  ) : null}
+                </p>
+              )}
+              {(!choice || open) && (
+                <ul className={`mt-2 flex flex-col gap-2 ${choice ? "pl-7" : ""}`}>
+                  {term.courses.map((course) => {
+                    const key = courseKey(course.code, course.name);
+                    const checked = done.includes(key);
+                    const blocked = !checked && blockingPrereqs(course, done, onPlan).length > 0;
+                    return (
+                      <li key={key}>
+                        <button
+                          type="button"
+                          onClick={() => toggle(course)}
+                          disabled={blocked}
+                          aria-pressed={checked}
+                          className={`flex w-full items-start gap-3 text-left ${blocked ? "cursor-not-allowed opacity-40" : ""}`}
+                        >
+                          <span
+                            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 ${checked ? "border-neon bg-neon text-paper" : "border-ink bg-paper"}`}
+                            aria-hidden="true"
+                          >
+                            {checked && <Check size={12} strokeWidth={3} />}
+                          </span>
+                          <span className="text-sm leading-relaxed">
+                            <span className="font-semibold">{course.code}. </span>
+                            {course.name}
+                            {courseNeeds(course) && (
+                              <span className="mt-1 block text-muted">{courseNeeds(course)}</span>
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </li>
+          );
+        })}
       </ol>
     </div>
   );
+}
+
+function choiceTitle(pick: "some", credits: string) {
+  if (/choose/i.test(credits)) return credits;
+  return pick === "some" ? "Choose from these" : "Choose 1";
 }
 
 function courseByKey(terms: { courses: { code: string; name: string }[] }[], key: string) {
